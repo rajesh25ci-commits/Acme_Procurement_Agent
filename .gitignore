@@ -8,4 +8,5 @@ venv/
 scratch_*.py
 cache/
 data/
-data/
+outputs/
+playbook/
