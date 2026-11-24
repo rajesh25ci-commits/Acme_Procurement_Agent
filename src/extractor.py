@@ -147,7 +147,7 @@ class FactExtractor:
                 has_banned = True
                 banned_type = "auto_renewal"
                 banned_snippet = "auto-renewal"
-        elif any(k in l_low for k in ['exclusive supplier', 'buy only from']):
+        elif any(k in l_low for k in ['exclusive supplier', 'buy only from', 'only from us']) or re.search(r'buy\b[^\.\n]*\bonly from\b', l_low):
             if not any(k in l_low for k in ['not asking for exclusivity', 'no exclusivity', 'not exclusive']):
                 has_banned = True
                 banned_type = "exclusivity"
@@ -217,14 +217,14 @@ class FactExtractor:
             vol_thresh = int(vol_m.group(2))
 
         # A: Check Correction
-        corr_m = re.search(r'CORRECTION\s*[—–-]\s*the price in my previous email should read\s*(?:[A-Za-z₹Rs\.\s]*)\s*([0-9,]+(?:\.\d+)?)', latest_msg, re.I)
+        corr_m = re.search(r'CORRECTION\s*[—–-]\s*the price in my previous email should read\s*(?:[A-Za-z₹Rs\.\s]*)\s*([0-9,]+(?:\.\d+)?(?:\s*(?:lakh|k))?)', latest_msg, re.I)
         if corr_m:
             raw_amt = parse_number_value(corr_m.group(1))
             struct = "per_unit"
             
         # B: Check Total for all
         elif re.search(r'in total for all', latest_msg, re.I):
-            tot_m = re.search(r'(?:[₹Rs\.\$€£\s]|INR|USD|EUR|GBP)*([0-9,]+(?:\.\d+)?)\s*(?:lakh|k)?\s*in total for all\s*(\d+)', latest_msg, re.I)
+            tot_m = re.search(r'(?:[₹Rs\.\$€£\s]|INR|USD|EUR|GBP)*([0-9,]+(?:\.\d+)?(?:\s*(?:lakh|k))?)\s*in total for all\s*(\d+)', latest_msg, re.I)
             if tot_m:
                 raw_amt = parse_number_value(tot_m.group(1))
                 struct = "total_for_all"
@@ -232,8 +232,8 @@ class FactExtractor:
                 has_usable = False
 
         # C: Check Range
-        elif re.search(r'between\s*(?:[A-Za-z₹Rs\.\s]*)\s*([0-9,]+(?:\.\d+)?)\s*and\s*(?:[A-Za-z₹Rs\.\s]*)\s*([0-9,]+(?:\.\d+)?)', latest_msg, re.I):
-            rng_m = re.search(r'between\s*(?:[A-Za-z₹Rs\.\s]*)\s*([0-9,]+(?:\.\d+)?)\s*and\s*(?:[A-Za-z₹Rs\.\s]*)\s*([0-9,]+(?:\.\d+)?)', latest_msg, re.I)
+        elif re.search(r'between\s*(?:[A-Za-z₹Rs\.\s]*)\s*([0-9,]+(?:\.\d+)?(?:\s*(?:lakh|k))?)\s*and\s*(?:[A-Za-z₹Rs\.\s]*)\s*([0-9,]+(?:\.\d+)?(?:\s*(?:lakh|k))?)', latest_msg, re.I):
+            rng_m = re.search(r'between\s*(?:[A-Za-z₹Rs\.\s]*)\s*([0-9,]+(?:\.\d+)?(?:\s*(?:lakh|k))?)\s*and\s*(?:[A-Za-z₹Rs\.\s]*)\s*([0-9,]+(?:\.\d+)?(?:\s*(?:lakh|k))?)', latest_msg, re.I)
             raw_amt = parse_number_value(rng_m.group(2))  # Conservative upper bound
             struct = "per_unit"
 
@@ -243,7 +243,7 @@ class FactExtractor:
             disc_pct = float(dp_m.group(1))
             struct = "discount_on_previous"
             earlier_text = msg.split('[Latest message')[0]
-            prev_m = re.findall(r'(?:quote (?:is|was)\s*(?:[A-Za-z₹Rs\.\s]*))\s*([0-9,]+(?:\.\d+)?)', earlier_text, re.I)
+            prev_m = re.findall(r'(?:quote (?:is|was)\s*(?:[A-Za-z₹Rs\.\s]*))\s*([0-9,]+(?:\.\d+)?(?:\s*(?:lakh|k))?)', earlier_text, re.I)
             if prev_m:
                 prev_amt = parse_number_value(prev_m[-1])
                 raw_amt = prev_amt
@@ -257,8 +257,8 @@ class FactExtractor:
                 has_usable = False
 
         # E: Check Discount on list price
-        elif re.search(r'(\d+(?:\.\d+)?)\s*%\s*discount on our list price of\s*(?:[A-Za-z₹Rs\.\s]*)\s*([0-9,]+(?:\.\d+)?)', latest_msg, re.I):
-            dl_m = re.search(r'(\d+(?:\.\d+)?)\s*%\s*discount on our list price of\s*(?:[A-Za-z₹Rs\.\s]*)\s*([0-9,]+(?:\.\d+)?)', latest_msg, re.I)
+        elif re.search(r'(\d+(?:\.\d+)?)\s*%\s*discount on our list price of\s*(?:[A-Za-z₹Rs\.\s]*)\s*([0-9,]+(?:\.\d+)?(?:\s*(?:lakh|k))?)', latest_msg, re.I):
+            dl_m = re.search(r'(\d+(?:\.\d+)?)\s*%\s*discount on our list price of\s*(?:[A-Za-z₹Rs\.\s]*)\s*([0-9,]+(?:\.\d+)?(?:\s*(?:lakh|k))?)', latest_msg, re.I)
             disc_pct = float(dl_m.group(1))
             list_price = parse_number_value(dl_m.group(2))
             raw_amt = list_price
@@ -269,7 +269,7 @@ class FactExtractor:
             fr_m = re.search(r'plus\s*(\d+)\s*free\s+[a-z\s]+for every\s*(\d+)\s*you pay for', latest_msg, re.I)
             get_y = int(fr_m.group(1))
             buy_x = int(fr_m.group(2))
-            un_m = re.search(r'(?:can do|quote|offer is|final price is)\s*(?:[A-Za-z₹Rs\.\s]*)\s*([0-9,]+(?:\.\d+)?)', latest_msg, re.I)
+            un_m = re.search(r'(?:can do|quote|offer is|can offer|revised offer is|final price is)\s*(?:[A-Za-z₹Rs\.\s]*)\s*([0-9,]+(?:\.\d+)?(?:\s*(?:lakh|k))?)', latest_msg, re.I)
             if un_m:
                 raw_amt = parse_number_value(un_m.group(1))
                 struct = "buy_x_get_y_free"
@@ -277,8 +277,8 @@ class FactExtractor:
                 has_usable = False
 
         # G: Check Tiered pricing
-        elif re.search(r'for orders of up to\s*(\d+)[^,;]+,\s*and\s*(?:[A-Za-z₹Rs\.\s]*)\s*([0-9,]+(?:\.\d+)?)', latest_msg, re.I):
-            tr_m = re.search(r'(?:[A-Za-z₹Rs\.\s]*)\s*([0-9,]+(?:\.\d+)?)\s*[a-z\s/]+for orders of up to\s*(\d+)[^,;]+,\s*and\s*(?:[A-Za-z₹Rs\.\s]*)\s*([0-9,]+(?:\.\d+)?)', latest_msg, re.I)
+        elif re.search(r'for orders of up to\s*(\d+)[^,;]+,\s*and\s*(?:[A-Za-z₹Rs\.\s]*)\s*([0-9,]+(?:\.\d+)?(?:\s*(?:lakh|k))?)', latest_msg, re.I):
+            tr_m = re.search(r'(?:[A-Za-z₹Rs\.\s]*)\s*([0-9,]+(?:\.\d+)?(?:\s*(?:lakh|k))?)\s*[a-z\s/]+for orders of up to\s*(\d+)[^,;]+,\s*and\s*(?:[A-Za-z₹Rs\.\s]*)\s*([0-9,]+(?:\.\d+)?(?:\s*(?:lakh|k))?)', latest_msg, re.I)
             if tr_m:
                 p1 = parse_number_value(tr_m.group(1))
                 limit_bracket = int(tr_m.group(2))
@@ -295,7 +295,7 @@ class FactExtractor:
             if pk_m:
                 pack_qty = int(pk_m.group(1))
                 struct = "per_pack"
-            val_m = re.search(r'(?:quote|can do|offer is|can offer|revised offer is|final price is)\s*(?:[A-Za-z₹Rs\.\s]*)\s*([0-9,]+(?:\.\d+)?)', latest_msg, re.I)
+            val_m = re.search(r'(?:quote|can do|offer is|can offer|revised offer is|final price is)\s*(?:[A-Za-z₹Rs\.\s]*)\s*([0-9,]+(?:\.\d+)?(?:\s*(?:lakh|k))?)', latest_msg, re.I)
             if val_m:
                 raw_amt = parse_number_value(val_m.group(1))
 
@@ -304,25 +304,25 @@ class FactExtractor:
             if p100_m:
                 pack_qty = int(p100_m.group(1))
                 struct = "per_pack"
-            val_m = re.search(r'(?:quote|can do|offer is|can offer|revised offer is|final price is)\s*(?:[A-Za-z₹Rs\.\s]*)\s*([0-9,]+(?:\.\d+)?)', latest_msg, re.I)
+            val_m = re.search(r'(?:quote|can do|offer is|can offer|revised offer is|final price is)\s*(?:[A-Za-z₹Rs\.\s]*)\s*([0-9,]+(?:\.\d+)?(?:\s*(?:lakh|k))?)', latest_msg, re.I)
             if val_m:
                 raw_amt = parse_number_value(val_m.group(1))
 
         elif 'per ream' in latest_msg.lower():
             struct = "per_ream"
-            val_m = re.search(r'(?:quote|can do|offer is|can offer|revised offer is|final price is)\s*(?:[A-Za-z₹Rs\.\s]*)\s*([0-9,]+(?:\.\d+)?)', latest_msg, re.I)
+            val_m = re.search(r'(?:quote|can do|offer is|can offer|revised offer is|final price is)\s*(?:[A-Za-z₹Rs\.\s]*)\s*([0-9,]+(?:\.\d+)?(?:\s*(?:lakh|k))?)', latest_msg, re.I)
             if val_m:
                 raw_amt = parse_number_value(val_m.group(1))
 
         elif 'per dozen' in latest_msg.lower() or 'a dozen' in latest_msg.lower():
             struct = "per_dozen"
-            val_m = re.search(r'(?:quote|can do|offer is|can offer|revised offer is|final price is)\s*(?:[A-Za-z₹Rs\.\s]*)\s*([0-9,]+(?:\.\d+)?)', latest_msg, re.I)
+            val_m = re.search(r'(?:quote|can do|offer is|can offer|revised offer is|final price is)\s*(?:[A-Za-z₹Rs\.\s]*)\s*([0-9,]+(?:\.\d+)?(?:\s*(?:lakh|k))?)', latest_msg, re.I)
             if val_m:
                 raw_amt = parse_number_value(val_m.group(1))
 
         # I: Standard Unit Offer
         else:
-            std_m = re.search(r'(?:can do|quote|offer is|can offer|revised offer is|final price is|read)\s*(?:INR|USD|EUR|GBP|AED|SGD|JPY|Rs\.|₹|\$|€|£)?\s*([0-9,]+(?:\.\d+)?)', latest_msg, re.I)
+            std_m = re.search(r'(?:can do|quote|offer is|can offer|revised offer is|final price is|read)\s*(?:INR|USD|EUR|GBP|AED|SGD|JPY|Rs\.|₹|\$|€|£)?\s*([0-9,]+(?:\.\d+)?(?:\s*(?:lakh|k))?)', latest_msg, re.I)
             if std_m:
                 raw_amt = parse_number_value(std_m.group(1))
                 struct = "per_unit"

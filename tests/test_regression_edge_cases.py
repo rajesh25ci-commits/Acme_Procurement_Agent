@@ -192,3 +192,22 @@ def test_volume_discount_threshold_evaluation(threads_dict, playbook, extractor)
     # Price remains 10,582 (not 9,523.8). At r=3, R=3, walkaway is 11,000, order total 52,910 <= 700k -> ACCEPT
     decision_fails = evaluate_thread(row_fails, facts_fails, playbook)
     assert decision_fails == "ACCEPT:ACCEPTABLE_PRICE:"
+
+def test_exclusivity_buy_only_from_us(threads_dict, playbook, extractor):
+    """Verifies that 'Acme will buy these items only from us for the next two years' triggers BANNED_TERM."""
+    for tid in ["T10031", "T10516", "T11057", "T11122", "T11635"]:
+        row = threads_dict[tid]
+        facts = extractor.extract(row, force_refresh=True)
+        assert facts.has_banned_term is True
+        assert facts.banned_term_type == "exclusivity"
+        decision = evaluate_thread(row, facts, playbook)
+        assert decision == "ESCALATE:BANNED_TERM:"
+
+def test_k_suffix_price_parsing(threads_dict, playbook, extractor):
+    """Verifies that ₹58.3k in T10489 is parsed as 58300.0, which exceeds approval limit for 200 laptops."""
+    row = threads_dict["T10489"]
+    facts = extractor.extract(row, force_refresh=True)
+    assert facts.raw_amount == 58300.0
+    # 58,300 * 200 = 11,660,000 > 4,000,000 approval limit
+    decision = evaluate_thread(row, facts, playbook)
+    assert decision == "ESCALATE:OVER_APPROVAL_LIMIT:"

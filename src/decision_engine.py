@@ -133,7 +133,7 @@ def evaluate_thread(
         return "ACCEPT:ACCEPTABLE_PRICE:"
     else:
         # Deal is not acceptable at round r
-        if r == R:
+        if r >= R:
             return "REJECT:ABOVE_WALKAWAY:"
         else:
             counter_val = round_half_up(L_r)
